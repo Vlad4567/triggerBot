@@ -7,11 +7,7 @@ import { startKeyboard } from "../commands/botKeyboards";
 import { client } from "../services/user";
 import { Api } from "telegram";
 import bigInt from "big-integer";
-import logger from "../utils/func/logger";
-import { writeFileSync } from "fs";
-import userConfig from "../config/user";
-
-const CANCEL_COMMAND = "cancel";
+import { CANCEL_COMMAND } from "../utils/commands";
 
 export default (bot: Telegraf<Context<Update>>) => {
   bot.action(botActions.addChannel, async (ctx) => {
@@ -30,124 +26,6 @@ export default (bot: Telegraf<Context<Update>>) => {
       };
 
       await replyProvideChannels();
-
-      bot.command(CANCEL_COMMAND, async (ctx) => {
-        bot.command(CANCEL_COMMAND, () => {});
-
-        bot.on("text", () => {});
-
-        userStates.delete(ctx.from.id);
-        ctx.reply("Choose your option", startKeyboard);
-      });
-
-      bot.on("text", async (ctx) => {
-        const userId = ctx.from.id;
-        const state = userStates.get(userId);
-
-        if (state === botActions.addChannel) {
-          const link = ctx.message?.text.trim();
-          const channelLink = link.startsWith("@")
-            ? link.slice(1)
-            : link.split("/").slice(-1)[0];
-          const channel = await client.invoke(
-            new Api.contacts.ResolveUsername({
-              username: channelLink,
-            })
-          );
-          const isJoined = (
-            (await client.invoke(
-              new Api.messages.GetDialogs({
-                offsetDate: 0,
-                offsetId: 0,
-                offsetPeer: new Api.InputPeerEmpty(),
-                limit: 2147483647,
-                hash: bigInt(0),
-              })
-            )) as any
-          ).chats.some((chat: any) => `${chat.id}` === `${channel.chats[0].id}`);
-          // const isChannelIncludedIntoFolder = folder.includePeers.some((peer: any) => peer.channelId === channel.chats[0].id)
-          const channelDB = await Channel.findOne({
-            channelId: channel.chats[0].id,
-          });
-
-          if (channelDB?.userIds.includes(ctx.from.id)) {
-            await ctx.reply("Channel already exists");
-          } else if (channelDB) {
-            channelDB.userIds.push(ctx.from.id);
-            await channelDB.save();
-            await ctx.reply(`Added: ${channelDB.channelName}`);
-          } else if (isJoined) {
-            await ctx.reply(
-              "This channel is not included into folder (unavailable for now)"
-            );
-          } else if (!isJoined) {
-            await client.invoke(
-              new Api.channels.JoinChannel({ channel: link })
-            );
-            const joinedChannel = (
-              (await client.invoke(
-                new Api.messages.GetDialogs({
-                  offsetDate: 0,
-                  offsetId: 0,
-                  offsetPeer: new Api.InputPeerEmpty(),
-                  limit: 2147483647,
-                  hash: bigInt(0),
-                })
-              )) as any
-            ).chats.find(
-              (chat: any) => `${chat.id}` === `${channel.chats[0].id}`
-            );
-            const newChannel = new Channel({
-              channelName: (channel.chats[0] as any).title,
-              channelId: channel.chats[0].id,
-              accessHash: joinedChannel.accessHash,
-              link: channelLink,
-              userIds: [ctx.from.id],
-            });
-            await newChannel.save();
-
-            const folder = (
-              await client.invoke(new Api.messages.GetDialogFilters())
-            ).filters.find((f: any) => f.id === userConfig.folderId) as any;
-
-            await client.invoke(
-              new Api.messages.UpdateDialogFilter({
-                id: userConfig.folderId,
-                filter: new Api.DialogFilter({
-                  id: userConfig.folderId,
-                  title: "triggerBot",
-                  pinnedPeers: [],
-                  includePeers: [
-                    ...folder.includePeers,
-                    new Api.InputPeerChannel({
-                      channelId: bigInt(newChannel.channelId),
-                      accessHash: bigInt(newChannel.accessHash),
-                    }),
-                  ],
-                  excludePeers: [],
-                }),
-              })
-            );
-            await client.invoke(
-              new Api.folders.EditPeerFolders({
-                folderPeers: [
-                  new Api.InputFolderPeer({
-                    peer: new Api.InputPeerChannel({
-                      channelId: channel.chats[0].id, // The ID of the channel you want to archive
-                      accessHash: joinedChannel.accessHash, // The access hash of the channel
-                    }),
-                    folderId: 1, // 1 represents the archive folder
-                  }),
-                ],
-              }))
-
-            await ctx.reply(`Added: ${newChannel.channelName}`);
-          } else {
-            ctx.reply("Error");
-          }
-          await replyProvideChannels();
-        }
-      });
     } catch (err) {
       ctx.reply("An error occurred while adding the channel.");
     }
@@ -183,6 +61,7 @@ export default (bot: Telegraf<Context<Update>>) => {
                     callback_data:
                       channels[i].accessHash +
                       channels[i].channelId +
+                      ctx.from.id +
                       "_delete",
                   },
                 ]
@@ -192,41 +71,45 @@ export default (bot: Telegraf<Context<Update>>) => {
 
           channels.forEach((channel) => {
             bot.action(
-              channel.accessHash + channel.channelId + "_delete",
-              async (ctx) => {
-                channel.userIds = channel.userIds.filter(
-                  (userId) => userId !== ctx.from.id
+              channel.accessHash + channel.channelId + ctx.from.id + "_delete",
+              async (ctxTwo) => {
+                const channelToDelete = (await Channel.findOne({ userIds: ctx.from.id, channelId: channel.channelId }))!;
+                channelToDelete.userIds = channelToDelete.userIds.filter(
+                  (userId) => userId !== ctxTwo.from.id
                 );
-                if (channel.userIds.length === 0) {
-                  await Channel.deleteOne({ channelId: channel.channelId });
+                if (channelToDelete.userIds.length === 0) {
+                  await Channel.deleteOne({ channelId: channelToDelete.channelId });
                   await client.invoke(
                     new Api.channels.LeaveChannel({
                       channel: new Api.InputPeerChannel({
-                          channelId: bigInt(channel.channelId),
-                          accessHash: bigInt(channel.accessHash),
+                        channelId: bigInt(channelToDelete.channelId),
+                        accessHash: bigInt(channelToDelete.accessHash),
                       }),
-                  })
+                    })
                   );
                 } else {
-                  await channel.save();
+                  await channelToDelete.save();
                 }
 
-                channels = await Channel.find({ userId: ctx.from.id });
-                await ctx.reply("Channel deleted.", {
+                channels = await Channel.find({ userId: ctxTwo.from.id });
+                await ctxTwo.reply("Channel deleted.", {
                   reply_markup: {
                     keyboard: [[{ text: "/start" }]],
                   },
                 });
                 bot.action(
-                  channel.accessHash + channel.channelId + "_delete",
+                  channel.accessHash +
+                    channel.channelId +
+                    ctxTwo.from.id +
+                    "_delete",
                   () => {}
                 );
 
                 if (channels.length !== 0) {
                   await generateKeyboard();
                 } else {
-                  await ctx.reply("No channels to delete.");
-                  await ctx.reply("Choose your option", startKeyboard);
+                  await ctxTwo.reply("No channels to delete.");
+                  await ctxTwo.reply("Choose your option", startKeyboard);
                 }
               }
             );

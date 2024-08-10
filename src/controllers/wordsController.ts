@@ -24,39 +24,6 @@ export default (bot: Telegraf<Context<Update>>) => {
       };
 
       replyProvideWords();
-
-      bot.command(CANCEL_COMMAND, async (ctx) => {
-        bot.command(CANCEL_COMMAND, () => {});
-        bot.on("text", () => {});
-
-        userStates.delete(ctx.from.id);
-        ctx.reply("Choose your option", startKeyboard);
-      });
-
-      bot.on("text", async (ctx) => {
-        const userId = ctx.from.id;
-        const state = userStates.get(userId);
-
-        if (state === botActions.addWord) {
-          const word = ctx.message?.text;
-          const hasDuplicate = await Word.findOne({ word, userId });
-
-          if (!hasDuplicate) {
-            const newWord = new Word({
-              word,
-              userId,
-              username: `${ctx.from.first_name} ${ctx.from.last_name} ${ctx.from.username}`,
-            });
-            await newWord.save();
-
-            await ctx.reply("Word received: " + word);
-            replyProvideWords();
-          } else {
-            await ctx.reply("Word already exists.");
-            replyProvideWords();
-          }
-        }
-      });
     } catch (err) {
       ctx.reply("An error occurred while adding the word.");
     }
@@ -87,7 +54,7 @@ export default (bot: Telegraf<Context<Update>>) => {
               .slice(i * columns, (i + 1) * columns)
               .map((word, j) => ({
                 text: word.word,
-                callback_data: word.word + word.userId + "_delete",
+                callback_data: word.word + word.userId + ctx.from.id + "_delete",
               }));
             matrix.push(row);
           }
@@ -95,7 +62,7 @@ export default (bot: Telegraf<Context<Update>>) => {
           if (remainder > 0) {
             const lastRow = arr.slice(rows * columns).map((word, j) => ({
               text: word.word,
-              callback_data: word.word + word.userId + "_delete",
+              callback_data: word.word + word.userId + ctx.from.id + "_delete",
             }));
             matrix.push(lastRow);
           }
@@ -111,7 +78,7 @@ export default (bot: Telegraf<Context<Update>>) => {
           });
 
           words.forEach((word) => {
-            bot.action(word.word + word.userId + "_delete", async (ctx) => {
+            bot.action(word.word + word.userId + ctx.from.id + "_delete", async (ctx) => {
               await Word.deleteOne({ word: word.word, userId: word.userId });
               
               words = await Word.find({ userId: ctx.from.id });
@@ -120,7 +87,7 @@ export default (bot: Telegraf<Context<Update>>) => {
                   keyboard: [[{ text: "/start" }]],
                 },
               });
-              bot.action(word.word + word.userId + "_delete", () => {});
+              bot.action(word.word + word.userId + ctx.from.id + "_delete", () => {});
               generateKeyboard();
             });
           });
