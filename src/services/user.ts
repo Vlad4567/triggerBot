@@ -114,7 +114,7 @@ export default async () => {
 
         words.forEach(async (word) => {
           try {
-            if (message.message.includes(word.word)) {
+            if (message.message.toLowerCase().includes(word.word.toLowerCase())) {
               await bot.telegram.sendMessage(
                 userId,
                 `New message that match one of the words: ${messageLink}`
