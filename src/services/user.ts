@@ -108,22 +108,26 @@ export default async () => {
         const inviteLink = fullChat.fullChat.exportedInvite.link;
         messageLink = `${inviteLink}/${messageId}`;
       }
+      if (channel?.userIds) {
+        for (const userId of channel.userIds) {
+          const wordsCollection = await Words.findOne({ userId });
 
-      for (const userId of channel?.userIds!) {
-        const wordsCollection = await Words.findOne({ userId });
-
-        wordsCollection?.words.forEach(async (word) => {
-          try {
-            if (message.message.toLowerCase().includes(word.toLowerCase())) {
-              await bot.telegram.sendMessage(
-                userId,
-                `New message that match one of the words: ${messageLink}`
-              );
+          if (wordsCollection?.words) {
+            for (const word of wordsCollection.words) {
+              try {
+                if (message.message.toLowerCase().includes(word.toLowerCase())) {
+                  await bot.telegram.sendMessage(
+                    userId,
+                    `New message that match "${word}" word: ${messageLink}`
+                  );
+                  break;
+                }
+              } catch (err) {
+                console.error(`Failed to send message to user ${userId}:`, err);
+              }
             }
-          } catch (err) {
-            console.error(`Failed to send message to user ${userId}:`, err);
           }
-        });
+        }
       }
     }
   }, new NewMessage({}));

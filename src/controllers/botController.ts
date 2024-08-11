@@ -131,21 +131,6 @@ export default (bot: Telegraf<Context<Update>>) => {
             }),
           })
         );
-        if (userConfig.folderId !== 1) {
-          await client.invoke(
-            new Api.folders.EditPeerFolders({
-              folderPeers: [
-                new Api.InputFolderPeer({
-                  peer: new Api.InputPeerChannel({
-                    channelId: channel.chats[0].id,
-                    accessHash: joinedChannel.accessHash,
-                  }),
-                  folderId: 1,
-                }),
-              ],
-            })
-          );
-        }
 
         await ctx.reply(`Added: ${newChannel.channelName}`);
       }
