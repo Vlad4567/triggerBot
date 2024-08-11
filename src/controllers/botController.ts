@@ -7,7 +7,7 @@ import { Api } from "telegram";
 import { client } from "../services/user";
 import bigInt from "big-integer";
 import Channel from "../models/channelModels";
-import Word from "../models/wordModels";
+import Words from "../models/wordModels";
 import userConfig from "../config/user";
 import { CANCEL_COMMAND } from "../utils/commands";
 
@@ -131,19 +131,21 @@ export default (bot: Telegraf<Context<Update>>) => {
             }),
           })
         );
-        await client.invoke(
-          new Api.folders.EditPeerFolders({
-            folderPeers: [
-              new Api.InputFolderPeer({
-                peer: new Api.InputPeerChannel({
-                  channelId: channel.chats[0].id,
-                  accessHash: joinedChannel.accessHash,
+        if (userConfig.folderId !== 1) {
+          await client.invoke(
+            new Api.folders.EditPeerFolders({
+              folderPeers: [
+                new Api.InputFolderPeer({
+                  peer: new Api.InputPeerChannel({
+                    channelId: channel.chats[0].id,
+                    accessHash: joinedChannel.accessHash,
+                  }),
+                  folderId: 1,
                 }),
-                folderId: 1,
-              }),
-            ],
-          })
-        );
+              ],
+            })
+          );
+        }
 
         await ctx.reply(`Added: ${newChannel.channelName}`);
       }
@@ -162,11 +164,12 @@ export default (bot: Telegraf<Context<Update>>) => {
         );
       };
       const word = ctx.message?.text;
-      const hasDuplicate = await Word.findOne({ word, userId });
+      const wordsCollection = await Words.findOne({ userId });
+      const hasDuplicate = wordsCollection?.words.some((item) => item.toLowerCase() === word.toLowerCase());
 
-      if (!hasDuplicate) {
-        const newWord = new Word({
-          word,
+      if (!hasDuplicate && !wordsCollection) {
+        const newWord = new Words({
+          words: [word],
           userId,
           username: `${ctx.from.first_name} ${ctx.from.last_name} ${ctx.from.username}`,
         });
@@ -174,6 +177,10 @@ export default (bot: Telegraf<Context<Update>>) => {
 
         await ctx.reply("Word received: " + word);
         replyProvideWords();
+      } else if (!hasDuplicate && wordsCollection) {
+        wordsCollection.words.push(word);
+        await wordsCollection.save();
+        await ctx.reply("Word received: " + word);
       } else {
         await ctx.reply("Word already exists.");
         replyProvideWords();

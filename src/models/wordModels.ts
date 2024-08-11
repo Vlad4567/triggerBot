@@ -8,8 +8,8 @@ const wordSchema = new mongoose.Schema({
   username: {
     type: String,
   },
-  word: {
-    type: String,
+  words: {
+    type: Array(String),
     required: true,
   },
 });

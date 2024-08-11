@@ -5,7 +5,7 @@ import logger from "../utils/func/logger";
 import { rl } from "..";
 import { Api, TelegramClient } from "telegram";
 import Channel from "../models/channelModels";
-import Word from "../models/wordModels";
+import Words from "../models/wordModels";
 import { writeFileSync } from "fs";
 import { bot } from "./bot";
 
@@ -110,11 +110,11 @@ export default async () => {
       }
 
       for (const userId of channel?.userIds!) {
-        const words = await Word.find({ userId });
+        const wordsCollection = await Words.findOne({ userId });
 
-        words.forEach(async (word) => {
+        wordsCollection?.words.forEach(async (word) => {
           try {
-            if (message.message.toLowerCase().includes(word.word.toLowerCase())) {
+            if (message.message.toLowerCase().includes(word.toLowerCase())) {
               await bot.telegram.sendMessage(
                 userId,
                 `New message that match one of the words: ${messageLink}`

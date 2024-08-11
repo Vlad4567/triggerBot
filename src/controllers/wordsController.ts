@@ -1,5 +1,5 @@
 import { Context, Telegraf } from "telegraf";
-import Word from "../models/wordModels";
+import Words from "../models/wordModels";
 import { Update } from "telegraf/typings/core/types/typegram";
 import botActions from "../commands/botActions";
 import { userStates } from "..";
@@ -31,38 +31,42 @@ export default (bot: Telegraf<Context<Update>>) => {
 
   bot.action(botActions.listWords, async (ctx) => {
     try {
-      const words = await Word.find({ userId: ctx.from.id });
-      const wordList = words.map((w) => w.word).join(", ");
-      ctx.reply(`Words: ${wordList}`);
+      const wordsCollection = await Words.findOne({ userId: ctx.from.id });
+      if (wordsCollection) {
+        const wordList = wordsCollection?.words.join(", ");
+        await ctx.reply(`Words: ${wordList}`);
+      } else {
+        await ctx.reply("No words found.")
+      }
     } catch (err) {
-      ctx.reply("An error occurred while retrieving the words.");
+      await ctx.reply("An error occurred while retrieving the words.");
     }
   });
 
   bot.action(botActions.deleteWords, async (ctx) => {
     try {
-      let words = await Word.find({ userId: ctx.from.id });
+      let wordsCollection = (await Words.findOne({ userId: ctx.from.id }))!;
 
-      if (words.length !== 0) {
-        const createMatrix = (arr: typeof words, columns = 8) => {
-          const rows = Math.floor(arr.length / columns);
-          const remainder = arr.length % columns;
+      if (wordsCollection?.words.length !== 0 && wordsCollection) {
+        const createMatrix = (words: typeof wordsCollection, columns = 8) => {
+          const rows = Math.floor(words.words.length / columns);
+          const remainder = words.words.length % columns;
           const matrix = [];
 
           for (let i = 0; i < rows; i++) {
-            const row = arr
+            const row = words.words
               .slice(i * columns, (i + 1) * columns)
               .map((word, j) => ({
-                text: word.word,
-                callback_data: word.word + word.userId + ctx.from.id + "_delete",
+                text: word,
+                callback_data: word + words.userId + ctx.from.id + "_delete",
               }));
             matrix.push(row);
           }
 
           if (remainder > 0) {
-            const lastRow = arr.slice(rows * columns).map((word, j) => ({
-              text: word.word,
-              callback_data: word.word + word.userId + ctx.from.id + "_delete",
+            const lastRow = words.words.slice(rows * columns).map((word, j) => ({
+              text: word,
+              callback_data: word + words.userId + ctx.from.id + "_delete",
             }));
             matrix.push(lastRow);
           }
@@ -73,30 +77,46 @@ export default (bot: Telegraf<Context<Update>>) => {
         const generateKeyboard = async () => {
           await ctx.reply("Choose a word to delete:", {
             reply_markup: {
-              inline_keyboard: createMatrix(words),
+              inline_keyboard: createMatrix(wordsCollection),
             },
           });
 
-          words.forEach((word) => {
-            bot.action(word.word + word.userId + ctx.from.id + "_delete", async (ctx) => {
-              await Word.deleteOne({ word: word.word, userId: word.userId });
+          wordsCollection.words.forEach((word) => {
+            bot.action(word + wordsCollection.userId + ctx.from.id + "_delete", async (ctx) => {
+              const wordsCollectionToDelete = (await Words.findOne({ userId: ctx.from.id }))!
+
+
+              wordsCollectionToDelete.words = wordsCollectionToDelete.words.filter(item => item !== word)
+              if (wordsCollectionToDelete.words.length === 0) {
+                await Words.deleteOne({userId: ctx.from.id})
+              } else {
+                await wordsCollectionToDelete.save();
+              }
               
-              words = await Word.find({ userId: ctx.from.id });
+              wordsCollection = wordsCollectionToDelete;
               await ctx.reply("Word deleted.", {
                 reply_markup: {
                   keyboard: [[{ text: "/start" }]],
                 },
               });
-              bot.action(word.word + word.userId + ctx.from.id + "_delete", () => {});
-              generateKeyboard();
+              bot.action(word + wordsCollection.userId + ctx.from.id + "_delete", () => {});
+              if (wordsCollection.words.length === 0) {
+                await ctx.reply("No words left.", {
+                  reply_markup: {
+                    keyboard: [[{ text: "/start" }]],
+                  },
+                });
+              } else {
+                generateKeyboard();
+              }
             });
           });
         };
 
-        if (words.length !== 0) {
+        if (wordsCollection.words.length !== 0) {
           await generateKeyboard();
         } else {
-          await ctx.reply("No channels to delete.");
+          await ctx.reply("No words to delete.");
           await ctx.reply("Choose your option", startKeyboard);
         }
       } else {
