@@ -11,6 +11,7 @@ const wordsSchema = new Schema<IWordsSchema>({
     type: Number,
     ref: UserModel,
     required: true,
+    unique: true,
   },
   words: {
     type: [String],

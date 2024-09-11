@@ -11,6 +11,7 @@ const darkWordsSchema = new Schema<IDarkWordsSchema>({
     type: Number,
     ref: UserModel,
     required: true,
+    unique: true,
   },
   darkWords: {
     type: [String],

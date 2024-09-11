@@ -17,6 +17,7 @@ const channelSchema = new Schema<IChannelSchema>({
   channelId: {
     type: String,
     required: true,
+    unique: true,
   },
   accessHash: {
     type: String,
