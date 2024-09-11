@@ -1,6 +1,10 @@
 import { Context } from "telegraf";
 import { Update } from "telegraf/typings/core/types/typegram";
 
-export default (err: unknown, ctx: Context<Update>) => {
-  console.error(`Error for ${ctx.updateType}`, err);
-};
+export const handleError = (ctx: Context<Update>, err: unknown) => {
+  if (err instanceof Error) {
+    ctx.reply(err.message);
+  } else {
+    ctx.reply("An unknown error occurred");
+  }
+}

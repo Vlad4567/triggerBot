@@ -1,17 +1,26 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { Markup, Telegraf } from "telegraf";
 import botService from "./services/bot";
 import userService from "./services/user";
-import errorHandler from "./middlewares/errorHandler";
-import logger from "./utils/func/logger";
-import mongoose from "mongoose";
-import databaseConfig from "./config/database";
+import mongoose, { Document } from "mongoose";
+import databaseConfig from "./configs/database";
 import readline from "readline";
+
+import { IUserSchema } from "./models/userModel";
+import botActions from "./commands/botActions";
 
 const { mongoURI } = databaseConfig;
 
-export const userStates = new Map<number, string>();
+export const userStates = new Map<
+  number,
+  | typeof botActions.addWord
+  | typeof botActions.addChannel
+  | typeof botActions.addDarkWord
+>();
+export const users = new Map<
+  number,
+  Document<unknown, {}, IUserSchema> & IUserSchema & Required<{ _id: unknown }>
+>();
 
 export const rl = readline.createInterface({
   input: process.stdin,
@@ -21,4 +30,4 @@ export const rl = readline.createInterface({
 mongoose.connect(mongoURI);
 
 botService();
-userService().catch(logger.error);
+userService().catch(console.error);

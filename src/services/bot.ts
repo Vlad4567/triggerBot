@@ -1,25 +1,20 @@
-import mongoose from "mongoose";
-import database from "../config/database";
-import { Update } from "telegraf/typings/core/types/typegram";
-import { Context, Telegraf } from "telegraf";
-import wordRoutes from "../routes/wordRoutes";
-import Word from "../models/wordModels";
-import configTelegram from "../config/bot";
-import errorHandler from "../middlewares/errorHandler";
-import logger from "../utils/func/logger";
+import { Telegraf } from "telegraf";
+import wordsRoute from "../routes/bot/wordsRoute";
+import botRoute from "../routes/bot/botRoute";
+import channelsRoute from "../routes/bot/channelsRoute";
+import configTelegram from "../configs/bot";
+import darkWordsRoute from "../routes/bot/darkWordsRoute";
 
-const { mongoURI } = database;
 export const bot = new Telegraf(configTelegram.botToken);
 
 export default () => {
+  botRoute(bot);
+  channelsRoute(bot);
+  darkWordsRoute(bot);
+  wordsRoute(bot);
 
-  wordRoutes(bot);
-
-  bot.catch(errorHandler);
+  bot.catch(console.error);
   bot.launch();
 
-  process.once("SIGINT", () => bot.stop("SIGINT"));
-  process.once("SIGTERM", () => bot.stop("SIGTERM"));
-
-  logger.log("Telegram Bot started");
+  console.log("Telegram Bot started");
 };
