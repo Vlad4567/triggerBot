@@ -16,7 +16,7 @@ export default async () => {
   client.addEventHandler(async (event) => {
     const message = event.message;
     const peer: any = await message.getChat();
-    const username = peer.username;
+    const username = peer?.username;
     const messageId = message.id;
 
     const peerId =
