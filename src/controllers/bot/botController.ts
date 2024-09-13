@@ -25,7 +25,7 @@ import { addDarkWordToExistingCollection, createNewDarkWordCollection } from "..
 const handleAddChannel = async (ctx: Context<Update>) => {
   const replyProvideChannels = async () => {
     await ctx.reply(
-      `Please provide channels one by one in one of the following ways to add: "https://t.me/UkraineThai1", "@UkraineThai1" or type "${CANCEL_COMMAND}" to cancel`,
+      `Please provide channels one by one or through list in one of the following ways to add: "https://t.me/UkraineThai1", "@UkraineThai1" or type "${CANCEL_COMMAND}" to cancel`,
       {
         reply_markup: {
           keyboard: [[{ text: CANCEL_COMMAND }]],
@@ -34,30 +34,34 @@ const handleAddChannel = async (ctx: Context<Update>) => {
     );
   };
 
-  const link =
+  const message =
     ctx.message && "text" in ctx.message ? ctx.message.text.trim() : "";
-  const channelLink = link.startsWith("@")
-    ? link.slice(1)
-    : link.split("/").slice(-1)[0];
+  const links = message.split(/\s+/);
 
-  try {
-    const channel = await resolveChannel(channelLink);
-    const isJoined = await checkIfJoined(channel);
-    const channelDB = await Channel.findOne({ channelId: channel.chats[0].id });
+  for (const link of links) {
+    const channelLink = link.startsWith("@")
+      ? link.slice(1)
+      : link.split("/").slice(-1)[0];
 
-    if (channelDB?.users.includes(ctx.from!.id)) {
-      await ctx.reply("You have already added this channel");
-    } else if (channelDB) {
-      await addUserToExistingChannel(channelDB, ctx);
-    } else if (isJoined) {
-      await ctx.reply(
-        "This channel is not included into folder (unavailable for now)"
-      );
-    } else {
-      await addNewChannel(channel, link, ctx);
+    try {
+      const channel = await resolveChannel(channelLink);
+      const isJoined = await checkIfJoined(channel);
+      const channelDB = await Channel.findOne({ channelId: channel.chats[0].id });
+
+      if (channelDB?.users.includes(ctx.from!.id)) {
+        await ctx.reply(`You have already added the channel: ${link}`);
+      } else if (channelDB) {
+        await addUserToExistingChannel(channelDB, ctx);
+      } else if (isJoined) {
+        await ctx.reply(
+          `The channel ${link} is not included into folder (unavailable for now)`
+        );
+      } else {
+        await addNewChannel(channel, link, ctx);
+      }
+    } catch (err) {
+      handleError(ctx, err);
     }
-  } catch (err) {
-    handleError(ctx, err);
   }
 
   await replyProvideChannels();

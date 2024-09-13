@@ -1,4 +1,4 @@
-import { Api } from "telegram";
+import { Api, errors } from "telegram";
 import bigInt from "big-integer";
 import { client } from "../../../services/user";
 import mongoose, { Document } from "mongoose";
@@ -7,6 +7,7 @@ import { Context } from "telegraf";
 import { Update } from "telegraf/typings/core/types/typegram";
 import ChannelModel from "../../../models/channelModel";
 import userConfig from "../../../configs/user";
+import { handleError } from "../../../middlewares/errorHandler";
 
 export const resolveChannel = async (channelLink: string) => {
   return await client.invoke(
@@ -51,8 +52,55 @@ export const addNewChannel = async (
   link: string,
   ctx: Context<Update>
 ) => {
-  await client.invoke(new Api.channels.JoinChannel({ channel: link }));
+  try {
+    await client.invoke(new Api.channels.JoinChannel({ channel: link }));
+  } catch (err: any) {
+    if (err instanceof errors.FloodWaitError) {
+      const waitSeconds = err.seconds;
+      scheduleAddingTheChannel(
+        ctx,
+        waitSeconds * 1000 + 2000,
+        waitSeconds,
+        channel,
+        link
+      );
+
+      return;
+    } else {
+      throw err;
+    }
+  }
   const joinedChannel = await getJoinedChannel(channel);
+  await client.invoke(
+    new Api.messages.GetDialogs({
+      offsetDate: 0,
+      offsetId: 0,
+      offsetPeer: new Api.InputPeerEmpty(),
+      limit: 100,
+      hash: bigInt(0),
+    })
+  );
+  if (!joinedChannel?.accessHash) {
+    try {
+      await client.invoke(
+        new Api.channels.LeaveChannel({
+          channel: new Api.InputChannel({
+            channelId: channel.chats[0].id,
+            accessHash: (channel.chats[0] as any).accessHash,
+          }),
+        })
+      );
+    } catch (err) {
+      if (
+        err instanceof errors.RPCError &&
+        err.errorMessage === "USER_NOT_PARTICIPANT"
+      ) {
+      } else {
+        throw err;
+      }
+    }
+    throw new Error("This channel doesn't have information to join");
+  }
   const newChannel = await createNewChannelCollection(
     channel,
     joinedChannel,
@@ -60,6 +108,59 @@ export const addNewChannel = async (
   );
   await updateDialogFilter(newChannel);
   await ctx.reply(`Added: ${newChannel.channelName}`);
+};
+
+export const scheduleAddingTheChannel = async (
+  ctx: Context<Update>,
+  time: number,
+  waitSeconds: number,
+  channel: Api.contacts.ResolvedPeer,
+  link: string
+) => {
+  const addTime = new Date(Date.now() + time);
+  await ctx.reply(
+    `Channel by link ${link} will be tried to added automatically after ${waitSeconds} seconds (at ${addTime.toLocaleTimeString()}). Please wait.`
+  );
+
+  // Schedule the channel addition
+  setTimeout(async () => {
+    try {
+      try {
+        await client.invoke(new Api.channels.JoinChannel({ channel: link }));
+      } catch (err: any) {
+        if (err instanceof errors.FloodWaitError) {
+          const waitSeconds = err.seconds;
+          scheduleAddingTheChannel(
+            ctx,
+            time,
+            waitSeconds,
+            channel,
+            link
+          );
+
+          return;
+        } else {
+          throw err;
+        }
+      }
+      const joinedChannel = await getJoinedChannel(channel);
+      if (joinedChannel?.accessHash) {
+        const newChannel = await createNewChannelCollection(
+          channel,
+          joinedChannel,
+          ctx
+        );
+        await updateDialogFilter(newChannel);
+        await ctx.reply(`Added: ${newChannel.channelName}`);
+      } else {
+        await ctx.reply(
+          "Failed to add the channel. Please try again manually."
+        );
+      }
+    } catch (error) {
+      handleError(ctx, error);
+    }
+  }, time);
 };
 
 export const getJoinedChannel = async (
@@ -138,15 +239,13 @@ export const removeUserFromChannel = async (
     IChannelSchema & {
       _id: mongoose.Types.ObjectId;
     },
-  ctx: Context<Update>,
+  ctx: Context<Update>
 ) => {
   if (!ctx.from) {
     throw new Error("User information is missing");
   }
 
-  channelDB.users = channelDB.users.filter(
-    (user) => user !== ctx.from!.id
-  );
+  channelDB.users = channelDB.users.filter((user) => user !== ctx.from!.id);
 
   if (channelDB.users.length === 0) {
     await ChannelModel.deleteOne({
