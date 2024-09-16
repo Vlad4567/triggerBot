@@ -17,6 +17,8 @@ export const userStates = new Map<
   | typeof botActions.addWord
   | typeof botActions.addChannel
   | typeof botActions.addDarkWord
+  | typeof botActions.importSettings
+  | typeof botActions.exportSettings
 >();
 export const users = new Map<
   number,

@@ -2,10 +2,6 @@ import { Schema, model, Document } from "mongoose";
 
 export interface IUserSchema extends Document {
   telegramId: number;
-  firstName: string;
-  lastName?: string;
-  username?: string;
-  languageCode?: string;
   isBot: boolean;
   createdAt: Date;
   updatedAt: Date;

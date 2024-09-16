@@ -17,6 +17,29 @@ export const resolveChannel = async (channelLink: string) => {
   );
 };
 
+export const getChannelUsername = async (
+  channelId: string,
+  accessHash: string
+): Promise<string> => {
+  const result = await client.invoke(
+    new Api.channels.GetChannels({
+      id: [
+        new Api.InputPeerChannel({
+          channelId: bigInt(channelId),
+          accessHash: bigInt(accessHash),
+        }),
+      ],
+    })
+  );
+
+  if (result.chats && result.chats.length > 0 && !!(await ChannelModel.findOne({channelId}))) {
+    const channel = result.chats[0] as Api.Channel;
+    return '@' + channel.username || "";
+  }
+
+  throw new Error(`Channel ${channelId} not found`);
+};
+
 export const checkIfJoined = async (
   channel: Api.contacts.ResolvedPeer
 ): Promise<boolean> => {
@@ -130,13 +153,7 @@ export const scheduleAddingTheChannel = async (
       } catch (err: any) {
         if (err instanceof errors.FloodWaitError) {
           const waitSeconds = err.seconds;
-          scheduleAddingTheChannel(
-            ctx,
-            time,
-            waitSeconds,
-            channel,
-            link
-          );
+          scheduleAddingTheChannel(ctx, time, waitSeconds, channel, link);
 
           return;
         } else {
