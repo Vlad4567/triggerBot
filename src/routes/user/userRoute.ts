@@ -16,6 +16,7 @@ export default async () => {
   client.addEventHandler(async (event) => {
     const message = event.message;
     const peer: any = await message.getChat();
+    const sender: any = await message.getSender();
     const username = peer?.username;
     const messageId = message.id;
 
@@ -37,7 +38,7 @@ export default async () => {
             channel: peer,
           })
         );
-        const inviteLink = fullChat.fullChat.exportedInvite.link;
+        const inviteLink = fullChat.fullChat.exportedInvite?.link;
         messageLink = `${inviteLink}/${messageId}`;
       }
       if (channel?.users) {
@@ -60,7 +61,14 @@ export default async () => {
                 ) {
                   await bot.telegram.sendMessage(
                     userId,
-                    `New message that match "${word}" word: ${messageLink}`
+                    `<b>🗨️ Message:</b> ${message.message}
+
+🔗 <a href="${messageLink}">View Message</a>
+
+<b>👤 From:</b> <a href="https://t.me/${sender.username}">@${sender.username}</a>
+
+<b>📢 Channel:</b> <a href="https://t.me/${peer.username}">${peer.title}</a>`,
+                    { parse_mode: "HTML" }
                   );
                   break;
                 }
