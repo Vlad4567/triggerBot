@@ -59,13 +59,16 @@ export default async () => {
                       .includes(darkWord.toLowerCase())
                   )
                 ) {
+                  const fromUserId = (message.fromId as any).userId as bigint;
                   await bot.telegram.sendMessage(
                     userId,
                     `<b>🗨️ Message:</b> ${message.message}
 
 🔗 <a href="${messageLink}">View Message</a>
 
-<b>👤 From:</b> <a href="https://t.me/${sender.username}">@${sender.username}</a>
+<b>👤 From:</b> <a href="tg://user?id=${fromUserId}">${sender.firstName}${
+                      !!sender?.username ? `(${sender.username})` : ""
+                    }</a>
 
 <b>📢 Channel:</b> <a href="https://t.me/${peer.username}">${peer.title}</a>`,
                     { parse_mode: "HTML" }
