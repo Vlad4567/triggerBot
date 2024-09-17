@@ -8,6 +8,7 @@ import { Update } from "telegraf/typings/core/types/typegram";
 import ChannelModel from "../../../models/channelModel";
 import userConfig from "../../../configs/user";
 import { handleError } from "../../../middlewares/errorHandler";
+import generalConfig from "../../../configs/general";
 
 export const resolveChannel = async (channelLink: string) => {
   return await client.invoke(
@@ -53,9 +54,25 @@ export const checkIfJoined = async (
     })
   )) as any;
 
-  return dialogs.chats.some(
+  const isJoined = dialogs.chats.some(
     (chat: any) => `${chat.id}` === `${channel.chats[0].id}`
   );
+
+  if (generalConfig.environment === "PROD") {
+    if (isJoined) {
+      await client.invoke(
+        new Api.channels.LeaveChannel({
+          channel: new Api.InputPeerChannel({
+            channelId: (channel as any).chats[0].id,
+            accessHash: (channel as any).chats[0].accessHash,
+          }),
+        })
+      );
+    }
+    return false;
+  }
+
+  return isJoined
 };
 
 export const addUserToExistingChannel = async (
@@ -129,7 +146,10 @@ export const addNewChannel = async (
     joinedChannel,
     ctx
   );
-  await updateDialogFilter(newChannel);
+  if (generalConfig.environment === "DEV") {
+    await updateDialogFilter(newChannel);
+  }
+
   await ctx.reply(`Added: ${newChannel.channelName}`);
 };
 

@@ -7,7 +7,7 @@ import DarkWordsModel from "../../models/darkWordsModel";
 import { Api } from "telegram";
 import { bot } from "../../services/bot";
 import { NewMessage } from "telegram/events";
-import { Entity } from "telegram/define";
+import generalConfig from "../../configs/general";
 
 export default async () => {
   const { folderId } = userConfig;
@@ -28,7 +28,7 @@ export default async () => {
         `${peer.channelId}` === `${peerId}` || `${peer.userId}` === `${peerId}`
     );
 
-    if (isPeerInFolder) {
+    if (isPeerInFolder || generalConfig.environment === "PROD") {
       const channel = await ChannelModel.findOne({ channelId: peerId });
       let messageLink;
       if (username) {
@@ -39,7 +39,8 @@ export default async () => {
             channel: peer,
           })
         );
-        const inviteLink: string | undefined = fullChat.fullChat.exportedInvite?.link;
+        const inviteLink: string | undefined =
+          fullChat.fullChat.exportedInvite?.link;
         messageLink = `${inviteLink}/${messageId}`;
       }
       if (channel?.users) {
@@ -75,12 +76,14 @@ export default async () => {
                     }${sender.username ? ` (@${sender.username})` : ""}${
                       sender.username ? "</a>" : ""
                     }${
-                      sender.phone
-                        ? `\n\n<b>☎️ Phone:</b> ${sender.phone}`
-                        : ""
+                      sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
                     }
 
-<b>📢 Channel:</b> ${peer.username ? `<a href="https://t.me/@${peer.username}">` : ""}${peer.title}${peer.username ? "</a>" : ""}`,
+<b>📢 Channel:</b> ${
+                      peer.username
+                        ? `<a href="https://t.me/@${peer.username}">`
+                        : ""
+                    }${peer.title}${peer.username ? "</a>" : ""}`,
                     { parse_mode: "HTML" }
                   );
                   break;

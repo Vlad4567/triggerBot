@@ -57,7 +57,6 @@ const handleAddChannel = async (ctx: Context<Update>) => {
 
     try {
       const channel = await resolveChannel(channelLink);
-      const isJoined = await checkIfJoined(channel);
       const channelDB = await ChannelModel.findOne({
         channelId: channel.chats[0].id,
       });
@@ -66,7 +65,7 @@ const handleAddChannel = async (ctx: Context<Update>) => {
         await ctx.reply(`You have already added the channel: ${link}`);
       } else if (channelDB) {
         await addUserToExistingChannel(channelDB, ctx);
-      } else if (isJoined) {
+      } else if (await checkIfJoined(channel)) {
         await ctx.reply(
           `The channel ${link} is not included into folder (unavailable for now)`
         );
