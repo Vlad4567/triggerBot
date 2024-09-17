@@ -7,6 +7,7 @@ import DarkWordsModel from "../../models/darkWordsModel";
 import { Api } from "telegram";
 import { bot } from "../../services/bot";
 import { NewMessage } from "telegram/events";
+import { Entity } from "telegram/define";
 
 export default async () => {
   const { folderId } = userConfig;
@@ -38,7 +39,7 @@ export default async () => {
             channel: peer,
           })
         );
-        const inviteLink = fullChat.fullChat.exportedInvite?.link;
+        const inviteLink: string | undefined = fullChat.fullChat.exportedInvite?.link;
         messageLink = `${inviteLink}/${messageId}`;
       }
       if (channel?.users) {
@@ -59,18 +60,27 @@ export default async () => {
                       .includes(darkWord.toLowerCase())
                   )
                 ) {
-                  const fromUserId = (message.fromId as any).userId as bigint;
                   await bot.telegram.sendMessage(
                     userId,
                     `<b>🗨️ Message:</b> ${message.message}
 
 🔗 <a href="${messageLink}">View Message</a>
 
-<b>👤 From:</b> <a href="tg://user?id=${fromUserId}">${sender.firstName}${
-                      !!sender?.username ? `(${sender.username})` : ""
-                    }</a>
+<b>👤 From:</b> ${
+                      sender.username
+                        ? `<a href="https://t.me/@${sender.username}">`
+                        : ""
+                    }${sender.firstName}${
+                      sender.lastName ? ` ${sender.lastName}` : ""
+                    }${sender.username ? ` (@${sender.username})` : ""}${
+                      sender.username ? "</a>" : ""
+                    }${
+                      sender.phone
+                        ? `\n\n<b>☎️ Phone:</b> ${sender.phone}`
+                        : ""
+                    }
 
-<b>📢 Channel:</b> <a href="https://t.me/${peer.username}">${peer.title}</a>`,
+<b>📢 Channel:</b> ${peer.username ? `<a href="https://t.me/@${peer.username}">` : ""}${peer.title}${peer.username ? "</a>" : ""}`,
                     { parse_mode: "HTML" }
                   );
                   break;
