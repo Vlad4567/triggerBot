@@ -33,6 +33,7 @@ import {
 } from "../../utils/functions/bot/darkWord";
 import { bot } from "../../services/bot";
 import { encodeSettings } from "./settings";
+import ProfileModel, { IProfileItemSchema } from "../../models/profile.model";
 
 const handleAddChannel = async (ctx: Context<Update>) => {
   const replyProvideChannels = async () => {
@@ -470,7 +471,10 @@ const handleImportSettings = async (ctx: Context<Update>) => {
                 const channelModel = await ChannelModel.findOne({
                   channelId: channel.channelId,
                 });
-                const username = await getChannelUsername(channel.channelId, channel.accessHash);
+                const username = await getChannelUsername(
+                  channel.channelId,
+                  channel.accessHash
+                );
                 const resolvedChannel = await resolveChannel(username.slice(1));
 
                 if (channelModel) {
@@ -513,7 +517,10 @@ const handleImportSettings = async (ctx: Context<Update>) => {
                   channelId: channel.channelId,
                 });
 
-                const username = await getChannelUsername(channel.channelId, channel.accessHash);
+                const username = await getChannelUsername(
+                  channel.channelId,
+                  channel.accessHash
+                );
                 const resolvedChannel = await resolveChannel(username.slice(1));
 
                 if (channelModel) {
@@ -528,7 +535,7 @@ const handleImportSettings = async (ctx: Context<Update>) => {
                 }
               }
             } catch (err) {
-              console.log(err)
+              console.log(err);
             }
 
             keyboard.reply_markup.inline_keyboard[0] =
@@ -545,13 +552,172 @@ const handleImportSettings = async (ctx: Context<Update>) => {
       });
     }
 
+    if (decodedData.profiles && decodedData.profiles.length > 0) {
+      const btn: IKeyboardButton = {
+        text: "Profiles",
+        callback_data: (botActions.importProfiles +
+          ctx.from?.id) as IKeyboardButton["callback_data"],
+      };
+
+      keyboard.reply_markup.inline_keyboard.unshift([btn]);
+
+      bot.action(btn.callback_data, async () => {
+        const callbackData = {
+          replace: btn.callback_data + "_replace",
+          add: btn.callback_data + "_add",
+          importedSettings:
+            botActions.importSettings + ctx.from?.id + "imported",
+        };
+
+        await ctx.reply(`Replace or add profiles?`, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Replace",
+                  callback_data: callbackData.replace,
+                },
+                {
+                  text: "Add",
+                  callback_data: callbackData.add,
+                },
+              ],
+              [
+                {
+                  text: "Back",
+                  callback_data: callbackData.importedSettings,
+                },
+              ],
+            ],
+          },
+        });
+
+        bot.action(callbackData.importedSettings, async () => {
+          await ctx.reply("Settings:", keyboard);
+        });
+
+        bot.action(callbackData.replace, async () => {
+          try {
+            if (!ctx.from) {
+              throw new Error("User information is missing");
+            }
+
+            await ctx.reply("Replacing...");
+            let profileModel = await ProfileModel.findOne({
+              user: ctx.from.id,
+            });
+
+            if (!profileModel) {
+              profileModel = new ProfileModel({
+                user: ctx.from.id,
+              });
+            }
+
+            profileModel.profiles = profileModel.profiles.slice();
+
+            await profileModel.save();
+
+            keyboard.reply_markup.inline_keyboard[0] =
+              keyboard.reply_markup.inline_keyboard[0].filter(
+                (item) => item.callback_data !== btn.callback_data
+              );
+
+            await ctx.reply("Profiles replaced.");
+            await ctx.reply("Settings:", keyboard);
+          } catch (err) {
+            handleError(ctx, err);
+          }
+        });
+
+        bot.action(callbackData.add, async () => {
+          try {
+            if (!ctx.from) {
+              throw new Error("User information is missing");
+            }
+
+            await ctx.reply("Adding...");
+            let profileModel = await ProfileModel.findOne({
+              user: ctx.from.id,
+            });
+
+            if (!profileModel) {
+              profileModel = new ProfileModel({
+                user: ctx.from.id,
+              });
+            }
+
+            profileModel.profiles = [
+              ...profileModel.profiles,
+              ...(decodedData.profiles?.filter(
+                (item) =>
+                  !profileModel.profiles.some(
+                    (profile) => profile.title === item.title
+                  )
+              ) || []),
+            ];
+
+            await profileModel.save();
+
+            keyboard.reply_markup.inline_keyboard[0] =
+              keyboard.reply_markup.inline_keyboard[0].filter(
+                (item) => item.callback_data !== btn.callback_data
+              );
+
+            await ctx.reply("Profiles added.");
+            await ctx.reply("Settings:", keyboard);
+          } catch (err) {
+            handleError(ctx, err);
+          }
+        });
+      });
+    }
+
     await ctx.reply("What to import?", keyboard);
   } catch (err) {
     handleError(ctx, err);
   }
 };
 
-const handleExportSettings = async (ctx: Context<Update>) => {
+const handleAddProfile = async (ctx: Context<Update>) => {
+  try {
+    if (!ctx.from) {
+      throw new Error("User information is missing");
+    }
+
+    userStates.delete(ctx.from.id);
+
+    const message =
+      ctx.message && "text" in ctx.message ? ctx.message.text.trim() : "";
+
+    const profileModel =
+      (await ProfileModel.findOne({ user: ctx.from.id })) ||
+      new ProfileModel({
+        user: ctx.from.id,
+      });
+
+    if (profileModel.profiles.some((profile) => profile.title === message)) {
+      await ctx.reply(`"${message}" profile already exists.`);
+      await showMenu(ctx);
+      return;
+    }
+
+    profileModel.profiles.push({
+      title: message,
+    });
+
+    await profileModel.save();
+
+    await ctx.reply(`"${message}" profile added.`);
+    await showMenu(ctx);
+  } catch (err) {
+    handleError(ctx, err);
+  }
+};
+
+const handleAddProfileWhitelist = async (
+  ctx: Context<Update>,
+  profile: IProfileItemSchema["title"]
+) => {
   try {
     if (!ctx.from) {
       throw new Error("User information is missing");
@@ -560,11 +726,55 @@ const handleExportSettings = async (ctx: Context<Update>) => {
     const message =
       ctx.message && "text" in ctx.message ? ctx.message.text.trim() : "";
 
-    encodeSettings(ctx, {
-      whitelist: message.includes("1"),
-      blacklist: message.includes("2"),
-      channels: message.includes("3"),
-    });
+    const profileModel = await ProfileModel.findOne({ user: ctx.from.id });
+
+    const profileItemModel = profileModel?.profiles.find(
+      (item) => item.title === profile
+    );
+
+    if (profileModel && profileItemModel) {
+      if (profileItemModel.whitelist?.includes(message)) {
+        await ctx.reply(`"${message}" already exists in "${profile}" profile.`);
+        return;
+      }
+
+      profileItemModel.whitelist?.push(message);
+      await profileModel.save();
+      await ctx.reply(`"${message}" added to "${profile}" profile.`);
+    }
+  } catch (err) {
+    handleError(ctx, err);
+  }
+};
+
+const handleAddProfileBlacklist = async (
+  ctx: Context<Update>,
+  profile: IProfileItemSchema["title"]
+) => {
+  try {
+    if (!ctx.from) {
+      throw new Error("User information is missing");
+    }
+
+    const message =
+      ctx.message && "text" in ctx.message ? ctx.message.text.trim() : "";
+
+    const profileModel = await ProfileModel.findOne({ user: ctx.from.id });
+
+    const profileItemModel = profileModel?.profiles.find(
+      (item) => item.title === profile
+    );
+
+    if (profileModel && profileItemModel) {
+      if (profileItemModel.blacklist?.includes(message)) {
+        await ctx.reply(`"${message}" already exists in "${profile}" profile.`);
+        return;
+      }
+
+      profileItemModel.blacklist?.push(message);
+      await profileModel.save();
+      await ctx.reply(`"${message}" added to "${profile}" profile.`);
+    }
   } catch (err) {
     handleError(ctx, err);
   }
@@ -597,12 +807,22 @@ export const botCancel = async (ctx: Context<Update>) => {
     }
 
     if (userStates.has(ctx.from.id)) {
-      userStates.delete(ctx.from.id);
+      const state = userStates.get(ctx.from.id);
+      if (typeof state === "object" && "showMenu" in state) {
+        if (state.showMenu) {
+          await state.showMenu();
+        } else {
+          await showMenu(ctx);
+        }
+        userStates.delete(ctx.from.id);
+      } else {
+        userStates.delete(ctx.from.id);
+        await showMenu(ctx);
+      }
     } else {
-      ctx.reply("You have no active operations to cancel.");
+      await ctx.reply("You have no active operations to cancel.");
+      await showMenu(ctx);
     }
-
-    await showMenu(ctx);
   } catch (err) {
     handleError(ctx, err);
   }
@@ -617,25 +837,23 @@ export const botText = async (ctx: Context<Update>) => {
     const user = ctx.from.id;
     const state = userStates.get(user);
 
-    switch (state) {
-      case botActions.addChannel:
-        await handleAddChannel(ctx);
-        break;
-      case botActions.addWord:
-        await handleAddWord(ctx);
-        break;
-      case botActions.addDarkWord:
-        await handleAddDarkWord(ctx);
-        break;
-      case botActions.importSettings:
-        await handleImportSettings(ctx);
-        break;
-      case botActions.exportSettings:
-        await handleExportSettings(ctx);
-        break;
-      default:
-        await showMenu(ctx);
-        userStates.delete(user);
+    if (state === botActions.addChannel) {
+      await handleAddChannel(ctx);
+    } else if (state === botActions.addWord) {
+      await handleAddWord(ctx);
+    } else if (state === botActions.addDarkWord) {
+      await handleAddDarkWord(ctx);
+    } else if (state === botActions.importSettings) {
+      await handleImportSettings(ctx);
+    } else if (state === botActions.addProfile) {
+      await handleAddProfile(ctx);
+    } else if (state?.type === botActions.addProfileWhitelist) {
+      await handleAddProfileWhitelist(ctx, state.payload);
+    } else if (state?.type === botActions.addProfileBlacklist) {
+      await handleAddProfileBlacklist(ctx, state.payload);
+    } else {
+      await showMenu(ctx);
+      userStates.delete(user);
     }
   } catch (err) {
     handleError(ctx, err);

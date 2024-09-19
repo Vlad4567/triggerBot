@@ -5,7 +5,6 @@ export interface IChannelSchema {
   channelName: string;
   channelId: string;
   accessHash: string;
-  link: string;
   users: IUserSchema['telegramId'][];
 }
 

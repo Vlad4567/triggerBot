@@ -8,9 +8,16 @@ import readline from "readline";
 
 import { IUserSchema } from "./models/userModel";
 import botActions from "./commands/botActions";
-import http from 'http';
+import http from "http";
+import { IProfileItemSchema } from "./models/profile.model";
 
 const { mongoURI } = databaseConfig;
+
+interface UserStatesAction<T, Y = undefined> {
+  type: T;
+  payload: Y extends undefined ? undefined : Y;
+  showMenu?: () => Promise<unknown>;
+}
 
 export const userStates = new Map<
   number,
@@ -18,7 +25,9 @@ export const userStates = new Map<
   | typeof botActions.addChannel
   | typeof botActions.addDarkWord
   | typeof botActions.importSettings
-  | typeof botActions.exportSettings
+  | typeof botActions.addProfile
+  | UserStatesAction<typeof botActions.addProfileWhitelist, IProfileItemSchema['title']>
+  | UserStatesAction<typeof botActions.addProfileBlacklist, IProfileItemSchema['title']>
 >();
 export const users = new Map<
   number,

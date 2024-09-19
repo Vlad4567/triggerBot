@@ -8,9 +8,5 @@ export default (bot: Telegraf<Context<Update>>) => {
   bot.action(botActions.importSettings, importSettings);
 
   bot.action(botActions.exportSettings, exportSettings);
-  bot.action(botActions.exportAllSettings, (ctx) => encodeSettings(ctx, {
-    whitelist: true,
-    blacklist: true,
-    channels: true,
-  }))
+  bot.action(botActions.exportAllSettings, (ctx) => encodeSettings(ctx, true))
 };

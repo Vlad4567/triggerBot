@@ -19,6 +19,10 @@ export const startKeyboard: IKeyboard = {
   reply_markup: {
     inline_keyboard: [
       [
+        { text: "+ Profile", callback_data: botActions.addProfile },
+        { text: "all Profiles", callback_data: botActions.allProfiles },
+      ],
+      [
         { text: "+ Whitelist", callback_data: botActions.addWord },
         { text: "all Whitelist", callback_data: botActions.wordList },
         { text: "- Whitelist", callback_data: botActions.deleteWords },

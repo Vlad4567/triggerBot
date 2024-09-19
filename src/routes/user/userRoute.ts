@@ -8,6 +8,7 @@ import { Api } from "telegram";
 import { bot } from "../../services/bot";
 import { NewMessage } from "telegram/events";
 import generalConfig from "../../configs/general";
+import ProfileModel from "../../models/profile.model";
 
 export default async () => {
   const { folderId } = userConfig;
@@ -31,6 +32,7 @@ export default async () => {
     if (isPeerInFolder || generalConfig.environment === "PROD") {
       const channel = await ChannelModel.findOne({ channelId: peerId });
       let messageLink;
+
       if (username) {
         messageLink = `https://t.me/${username}/${messageId}`;
       } else {
@@ -43,56 +45,81 @@ export default async () => {
           fullChat.fullChat.exportedInvite?.link;
         messageLink = `${inviteLink}/${messageId}`;
       }
+
       if (channel?.users) {
         for (const userId of channel.users) {
+          const profileModel = await ProfileModel.findOne({
+            user: userId,
+          });
           const wordsCollection = await WordsModel.findOne({ user: userId });
           const darkWordsCollection = await DarkWordsModel.findOne({
             user: userId,
           });
 
-          if (wordsCollection?.words) {
-            for (const word of wordsCollection.words) {
-              try {
+          let isGlobalParsed = false;
+
+          if (profileModel) {
+            profileModel.profiles = profileModel.profiles.filter((profile) => {
+              if (!profile.isActive) {
+                return false;
+              }
+
+              if (
+                profile.whitelist?.some((word) =>
+                  message.message.toLowerCase().includes(word.toLowerCase())
+                )
+              ) {
                 if (
-                  message.message.toLowerCase().includes(word.toLowerCase()) &&
-                  !darkWordsCollection?.darkWords.some((darkWord) =>
-                    message.message
-                      .toLowerCase()
-                      .includes(darkWord.toLowerCase())
+                  profile.blacklist?.some((word) =>
+                    message.message.toLowerCase().includes(word.toLowerCase())
                   )
                 ) {
-                  await bot.telegram.sendMessage(
-                    userId,
-                    `<b>🗨️ Message:</b> ${message.message}
+                  return false;
+                } else {
+                  return true;
+                }
+              }
+            });
+          }
+
+          if (
+            wordsCollection?.words.some((word) =>
+              message.message.toLowerCase().includes(word.toLowerCase())
+            ) &&
+            !darkWordsCollection?.darkWords.some((word) =>
+              message.message.toLowerCase().includes(word.toLowerCase())
+            )
+          ) {
+            isGlobalParsed = true;
+          }
+
+          await bot.telegram.sendMessage(
+            userId,
+            `<b>🗨️ Message:</b> ${message.message}
 
 🔗 <a href="${messageLink}">View Message</a>
 
 <b>👤 From:</b> ${
-                      sender.username
-                        ? `<a href="https://t.me/@${sender.username}">`
-                        : ""
-                    }${sender.firstName}${
-                      sender.lastName ? ` ${sender.lastName}` : ""
-                    }${sender.username ? ` (@${sender.username})` : ""}${
-                      sender.username ? "</a>" : ""
-                    }${
-                      sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
-                    }
+              sender.username
+                ? `<a href="https://t.me/@${sender.username}">`
+                : ""
+            }${sender.firstName}${
+              sender.lastName ? ` ${sender.lastName}` : ""
+            }${sender.username ? ` (@${sender.username})` : ""}${
+              sender.username ? "</a>" : ""
+            }${!sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""}
 
 <b>📢 Channel:</b> ${
-                      peer.username
-                        ? `<a href="https://t.me/@${peer.username}">`
-                        : ""
-                    }${peer.title}${peer.username ? "</a>" : ""}`,
-                    { parse_mode: "HTML" }
-                  );
-                  break;
-                }
-              } catch (err) {
-                console.error(`Failed to send message to user ${userId}:`, err);
-              }
-            }
-          }
+              peer.username ? `<a href="https://t.me/@${peer.username}">` : ""
+            }${peer.title}${peer.username ? "</a>" : ""}
+
+<b>📋 Profiles:</b> ${isGlobalParsed ? "Global, " : ""}${
+              profileModel?.profiles
+                .map((profile) => profile.title)
+                .join(", ") || ""
+            }`,
+            { parse_mode: "HTML" }
+          );
         }
       }
     }

@@ -5,6 +5,7 @@ import channelsRoute from "../routes/bot/channelsRoute";
 import configTelegram from "../configs/bot";
 import darkWordsRoute from "../routes/bot/darkWordsRoute";
 import botSettings from "../routes/bot/settingsRoute";
+import profilesRoute from "../routes/bot/profiles.route";
 
 export const bot = new Telegraf(configTelegram.botToken);
 
@@ -14,6 +15,7 @@ export default () => {
   channelsRoute(bot);
   darkWordsRoute(bot);
   wordsRoute(bot);
+  profilesRoute(bot);
 
   bot.catch(console.error);
   bot.launch();

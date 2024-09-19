@@ -10,6 +10,12 @@ export default {
   channelList: "channel_list",
   deleteChannel: "delete_channel",
 
+  // Profile
+  addProfile: "add_profile",
+  allProfiles: "all_profiles",
+  addProfileWhitelist: "add_profile_whitelist",
+  addProfileBlacklist: "add_profile_blacklist",
+
   // Settings
   settings: "settings",
   importSettings: "import_settings",
@@ -17,5 +23,6 @@ export default {
   importBlacklist: "import_blacklist",
   importWhitelist: "import_whitelist",
   importChannels: "import_channels",
+  importProfiles: "import_profiles",
   exportAllSettings: "all_settings",
 } as const;
