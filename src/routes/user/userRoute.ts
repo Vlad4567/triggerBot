@@ -93,33 +93,33 @@ export default async () => {
             isGlobalParsed = true;
           }
 
-          await bot.telegram.sendMessage(
-            userId,
-            `<b>🗨️ Message:</b> ${message.message}
-
-🔗 <a href="${messageLink}">View Message</a>
-
-<b>👤 From:</b> ${
-              sender.username
-                ? `<a href="https://t.me/@${sender.username}">`
-                : ""
-            }${sender.firstName}${
-              sender.lastName ? ` ${sender.lastName}` : ""
-            }${sender.username ? ` (@${sender.username})` : ""}${
-              sender.username ? "</a>" : ""
-            }${!sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""}
-
-<b>📢 Channel:</b> ${
-              peer.username ? `<a href="https://t.me/@${peer.username}">` : ""
-            }${peer.title}${peer.username ? "</a>" : ""}
-
-<b>📋 Profiles:</b> ${isGlobalParsed ? "Global, " : ""}${
-              profileModel?.profiles
-                .map((profile) => profile.title)
-                .join(", ") || ""
-            }`,
-            { parse_mode: "HTML" }
-          );
+          if (isGlobalParsed || profileModel?.profiles.length || 0 > 0) {
+            await bot.telegram.sendMessage(
+              userId,
+              `<b>🗨️ Message:</b> ${message.message}
+  
+  🔗 <a href="${messageLink}">View Message</a>
+  
+  <b>👤 From:</b> ${
+    sender.username ? `<a href="https://t.me/@${sender.username}">` : ""
+  }${sender.firstName}${sender.lastName ? ` ${sender.lastName}` : ""}${
+                sender.username ? ` (@${sender.username})` : ""
+              }${sender.username ? "</a>" : ""}${
+                !sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
+              }
+  
+  <b>📢 Channel:</b> ${
+    peer.username ? `<a href="https://t.me/@${peer.username}">` : ""
+  }${peer.title}${peer.username ? "</a>" : ""}
+  
+  <b>📋 Profiles:</b> ${isGlobalParsed ? "Global, " : ""}${
+                profileModel?.profiles
+                  .map((profile) => profile.title)
+                  .join(", ") || ""
+              }`,
+              { parse_mode: "HTML" }
+            );
+          }
         }
       }
     }
