@@ -102,7 +102,7 @@ export default async () => {
   
   <b>👤 From:</b> ${
     sender.username ? `<a href="https://t.me/@${sender.username}">` : ""
-  }${sender.firstName}${sender.lastName ? ` ${sender.lastName}` : ""}${
+  }${sender.firstName ? sender.firstName : ''}${sender.lastName ? ` ${sender.lastName}` : ""}${
                 sender.username ? ` (@${sender.username})` : ""
               }${sender.username ? "</a>" : ""}${
                 !sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
