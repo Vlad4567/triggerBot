@@ -105,7 +105,7 @@ export default async () => {
   }${sender.firstName ? sender.firstName : ''}${sender.lastName ? ` ${sender.lastName}` : ""}${
                 sender.username ? ` (@${sender.username})` : ""
               }${sender.username ? "</a>" : ""}${
-                !sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
+                sender.phone ? `\n\n<b>☎️ Phone:</b> ${sender.phone}` : ""
               }
   
   <b>📢 Channel:</b> ${
